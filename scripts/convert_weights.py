@@ -2,6 +2,10 @@
 Reads Darknet config and weights and creates Keras model with TF backend.
 
     wget -O ../model_data/yolo.weights  https://pjreddie.com/media/files/yolov3.weights  --progress=bar:force:noscroll
+    python convert_weights.py \
+        --config_path ../model_data/yolo.cfg \
+        --weights_path ../model_data/yolo.weights \
+        --output_path ../model_data/yolo.h5
     wget -O ../model_data/tiny-yolo.weights  https://pjreddie.com/media/files/yolov3-tiny.weights  --progress=bar:force:noscroll
     python convert_weights.py \
         --config_path ../model_data/tiny-yolo.cfg \

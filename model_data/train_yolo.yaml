@@ -21,6 +21,6 @@ generator:
   color_val: 1.5
   flip_horizontal: true
   flip_vertical: false
-  resize_img: false
+  resize_img: true
   nb_threads: 0.9
 recompute-bottlenecks: false
