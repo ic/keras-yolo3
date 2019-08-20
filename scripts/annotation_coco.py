@@ -31,14 +31,15 @@ def parse_arguments():
     parser.add_argument('--path_annot', type=str, required=True,
                         help='Path to annotation for COCO dataset.')
     parser.add_argument('--path_images', type=str, required=True,
-                        help='Path to images of VOC dataset.')
+                        help='Path to images of COCO dataset.')
     parser.add_argument('--path_output', type=str, required=False, default='.',
                         help='Path to output folder.')
     arg_params = vars(parser.parse_args())
     for k in (k for k in arg_params if 'path' in k):
         arg_params[k] = update_path(arg_params[k])
         assert os.path.exists(arg_params[k]), 'missing (%s): %s' % (k, arg_params[k])
-    logging.debug('PARAMETERS: %s', repr(arg_params))
+    logging.info('PARAMETERS: \n%s', '\n'.join(['"%s": \t\t %r' % (k, arg_params[k])
+                                                for k in arg_params]))
     return arg_params
 
 

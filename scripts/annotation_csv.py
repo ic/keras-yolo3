@@ -18,21 +18,22 @@ import tqdm
 sys.path += [os.path.abspath('.'), os.path.abspath('..')]
 from yolo3.utils import update_path
 
-IMAGE_EXTENSIONS = ['.png', '.jpg']
-ANNOT_COLUMS = ['xmin', 'ymin', 'xmax', 'ymax', 'class']
+IMAGE_EXTENSIONS = ('.png', '.jpg')
+ANNOT_COLUMNS = ('xmin', 'ymin', 'xmax', 'ymax', 'class')
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description='Annotation Converter (VOC).')
+    parser = argparse.ArgumentParser(description='Annotation Converter (custom CSV).')
     parser.add_argument('--path_dataset', type=str, required=True,
-                        help='Path to VOC dataset.')
+                        help='Path to custom CSV dataset.')
     parser.add_argument('--path_output', type=str, required=False, default='.',
                         help='Path to output folder.')
     arg_params = vars(parser.parse_args())
     for k in (k for k in arg_params if 'path' in k):
         arg_params[k] = update_path(arg_params[k])
         assert os.path.exists(arg_params[k]), 'missing (%s): %s' % (k, arg_params[k])
-    logging.debug('PARAMETERS: %s', repr(arg_params))
+    logging.info('PARAMETERS: \n%s', '\n'.join(['"%s": \t\t %r' % (k, arg_params[k])
+                                                for k in arg_params]))
     return arg_params
 
 
@@ -44,16 +45,16 @@ def convert_annotation(path_csv, classes=None):
         df['class'] = 0
 
     records = []
-    for idx, row in df[ANNOT_COLUMS].iterrows():
+    for idx, row in df[list(ANNOT_COLUMNS)].iterrows():
         records.append(','.join([str(v) for v in row]))
     return records
 
 
 def _main(path_dataset, path_output, classes=None):
-    name_dataset = os.path.basename(path_dataset)
+    name_dataset = os.path.basename(os.path.dirname(path_dataset))
     list_csv = sorted(glob.glob(os.path.join(path_dataset, '*.csv')))
 
-    path_out_list = os.path.join(path_output, '%s_train.txt' % name_dataset)
+    path_out_list = os.path.join(path_output, '%s_dataset.txt' % name_dataset)
     logging.info('creating list file: %s', path_out_list)
 
     with open(path_out_list, 'w') as list_file:

@@ -44,7 +44,8 @@ def parse_arguments():
     for k in (k for k in arg_params if 'path' in k):
         arg_params[k] = update_path(arg_params[k])
         assert os.path.exists(arg_params[k]), 'missing (%s): %s' % (k, arg_params[k])
-    logging.debug('PARAMETERS: %s', repr(arg_params))
+    logging.info('PARAMETERS: \n%s', '\n'.join(['"%s": \t\t %r' % (k, arg_params[k])
+                                                for k in arg_params]))
     return arg_params
 
 
