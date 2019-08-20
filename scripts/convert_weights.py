@@ -1,7 +1,7 @@
 """
 Reads Darknet config and weights and creates Keras model with TF backend.
 
-    wget -O ../model_data/tiny-yolo.weights  https://pjreddie.com/media/files/tiny-yolo.weights  --progress=bar:force:noscroll
+    wget -O ../model_data/tiny-yolo.weights  https://pjreddie.com/media/files/yolo-tiny.weights  --progress=bar:force:noscroll
     python convert_weights.py \
         --config_path ../model_data/tiny-yolo.cfg \
         --weights_path ../model_data/tiny-yolo.weights \
@@ -17,6 +17,7 @@ import logging
 import configparser
 from collections import defaultdict
 
+import tqdm
 import numpy as np
 from keras import backend as K
 from keras.layers import (Conv2D, Input, ZeroPadding2D, Add,
@@ -258,7 +259,7 @@ def _main(config_path, weights_path, output_path, weights_only, plot_model):
                          ) if 'net_0' in cfg_parser.sections() else 5e-4
     count = 0
     out_index = []
-    for section in cfg_parser.sections():
+    for section in tqdm.tqdm(cfg_parser.sections()):
         logging.info('Parsing section "%s"', section)
         (all_layers, cfg_parser, section, prev_layer,
          weights_file, count, weight_decay, out_index) = parse_section(

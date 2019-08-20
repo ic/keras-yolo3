@@ -2,12 +2,12 @@
 Retrain the YOLO model for your own dataset.
 
     python training.py \
-        --path_dataset ./model_data/VOC_2007_train.txt \
-        --path_weights ./model_data/tiny-yolo.h5 \
-        --path_anchors ./model_data/tiny-yolo_anchors.csv \
-        --path_classes ./model_data/voc_classes.txt \
-        --path_output ./model_data \
-        --path_config ./model_data/train_tiny-yolo.yaml
+        --path_dataset ../model_data/VOC_2007_train.txt \
+        --path_weights ../model_data/tiny-yolo.h5 \
+        --path_anchors ../model_data/tiny-yolo_anchors.csv \
+        --path_classes ../model_data/voc_classes.txt \
+        --path_output ../model_data \
+        --path_config ../model_data/train_tiny-yolo.yaml
 
 """
 
@@ -107,7 +107,7 @@ def _export_classes(class_names, path_output):
         fp.write(os.linesep.join([str(cls) for cls in class_names]))
 
 
-def _export_model(model, is_tiny_version, image_size, anchors, nb_classes, path_output, name_prefix, name_sufix):
+def _export_model(model, path_output, name_prefix, name_sufix):
     path_weights = os.path.join(path_output, name_prefix + 'yolo_weights' + name_sufix + '.h5')
     logging.info('Exporting weights: %s', path_weights)
     model.save_weights(path_weights)
@@ -178,8 +178,7 @@ def _main(path_dataset, path_anchors, path_weights=None, path_output='.',
                             initial_epoch=0,
                             callbacks=[tb_logging, checkpoint])
         logging.info('Training took %f minutes', (time.time() - t_start) / 60.)
-        _export_model(model, is_tiny_version, config['image-size'], anchors, nb_classes,
-                      path_output, name_prefix, '_body')
+        _export_model(model, path_output, name_prefix, '_body')
 
     # Unfreeze and continue training, to fine-tune.
     # Train longer if the result is not good.
@@ -200,8 +199,7 @@ def _main(path_dataset, path_anchors, path_weights=None, path_output='.',
                         initial_epoch=config['epochs']['body'],
                         callbacks=[tb_logging, checkpoint, reduce_lr, early_stopping])
     logging.info('Training took %f minutes', (time.time() - t_start) / 60.)
-    _export_model(model, is_tiny_version, config['image-size'], anchors, nb_classes,
-                  path_output, name_prefix, '_final')
+    _export_model(model, path_output, name_prefix, '_final')
 
 
 if __name__ == '__main__':

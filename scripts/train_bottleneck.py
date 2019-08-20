@@ -109,8 +109,7 @@ def _main(path_dataset, path_anchors, path_weights=None, path_output='.',
             epochs=config['epochs']['bottlenecks'],
             initial_epoch=0,
             max_queue_size=1)
-        _export_model(model, False, config['image-size'], anchors, nb_classes,
-                      path_output, '', '_bottleneck')
+        _export_model(model, path_output, '', '_bottleneck')
 
         # train last layers with random augmented data
         model.compile(optimizer=Adam(lr=1e-3),
@@ -127,8 +126,7 @@ def _main(path_dataset, path_anchors, path_weights=None, path_output='.',
             initial_epoch=0,
             callbacks=[log_tb, checkpoint])
         logging.info('Training took %f minutes', (time.time() - t_start) / 60.)
-        _export_model(model, False, config['image-size'], anchors, nb_classes,
-                      path_output, '', '_body')
+        _export_model(model, path_output, '', '_body')
 
     # Unfreeze and continue training, to fine-tune.
     # Train longer if the result is not good.
@@ -152,8 +150,7 @@ def _main(path_dataset, path_anchors, path_weights=None, path_output='.',
             initial_epoch=config['epochs']['body'],
             callbacks=[log_tb, checkpoint, reduce_lr, early_stopping])
         logging.info('Training took %f minutes', (time.time() - t_start) / 60.)
-        _export_model(model, False, config['image-size'], anchors, nb_classes,
-                      path_output, '', '_final')
+        _export_model(model, path_output, '', '_final')
 
     # Further training if needed.
 
