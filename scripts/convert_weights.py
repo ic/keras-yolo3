@@ -1,11 +1,19 @@
 """
 Reads Darknet config and weights and creates Keras model with TF backend.
 
-    wget -O ../model_data/tiny-yolo.weights  https://pjreddie.com/media/files/yolo-tiny.weights  --progress=bar:force:noscroll
+    wget -O ../model_data/yolo.weights  https://pjreddie.com/media/files/yolov3.weights  --progress=bar:force:noscroll
+    wget -O ../model_data/tiny-yolo.weights  https://pjreddie.com/media/files/yolov3-tiny.weights  --progress=bar:force:noscroll
     python convert_weights.py \
         --config_path ../model_data/tiny-yolo.cfg \
         --weights_path ../model_data/tiny-yolo.weights \
         --output_path ../model_data/tiny-yolo.h5
+
+.. note:: For this conversion is GPu not needed and it may limit cause crashing
+ if you GPU memory is not sufficiently large. So we recommend to run this without GPU completly
+ setting `CUDA_VISIBLE_DEVICES=-1` nd then sun this script.
+
+.. note:: double check that you are working with last version of YOLO v3 model
+ (created after March 25 2018, yolov3.weights and/or yolov3-tiny.weights)
 
 """
 

@@ -1,0 +1,26 @@
+image-size: [608, 608]
+batch-size:
+  bottlenecks: 8
+  body: 8
+  fine: 8
+epochs:
+  bottlenecks: 25
+  body: 50
+  fine: 30
+CB_learning-rate:
+  factor: 0.01
+  patience: 3
+CB_stopping:
+  min_delta: 0
+  patience: 25
+valid-split: 0.1
+generator:
+  jitter: 0.3
+  color_hue: 0.1
+  color_sat: 1.5
+  color_val: 1.5
+  flip_horizontal: true
+  flip_vertical: false
+  resize_img: false
+  nb_threads: 0.9
+recompute-bottlenecks: false
