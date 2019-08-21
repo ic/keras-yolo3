@@ -40,7 +40,7 @@ NAME_CHECKPOINT = 'ep{epoch:03d}-loss{loss:.3f}-val_loss{val_loss:.3f}.h5'
 
 
 def _main(path_dataset, path_anchors, path_weights=None, path_output='.',
-          path_config=None, path_classes=None, gpu_num=1, **kwargs):
+          path_config=None, path_classes=None, nb_gpu=1, **kwargs):
 
     config = load_config(path_config, DEFAULT_CONFIG)
     anchors = get_anchors(path_anchors)
@@ -51,7 +51,7 @@ def _main(path_dataset, path_anchors, path_weights=None, path_output='.',
     # make sure you know what you freeze
     model, bottleneck_model, last_layer_model = create_model_bottleneck(
         config['image-size'], anchors, nb_classes, freeze_body=2,
-        weights_path=path_weights, gpu_num=gpu_num)
+        weights_path=path_weights, nb_gpu=nb_gpu)
 
     log_tb = TensorBoard(log_dir=path_output)
     checkpoint = ModelCheckpoint(os.path.join(path_output, NAME_CHECKPOINT),

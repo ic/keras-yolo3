@@ -398,7 +398,7 @@ def yolo_loss(args, anchors, num_classes, ignore_thresh=0.5, print_loss=False):
 
 
 def create_model(input_shape, anchors, num_classes, weights_path=None, model_factor=3,
-                 freeze_body=2, ignore_thresh=0.5, gpu_num=1):
+                 freeze_body=2, ignore_thresh=0.5, nb_gpu=1):
     """create the training model"""
     _INPUT_SHAPES = {0: 32, 1: 16, 2: 8, 3: 4}
     _FACTOR_YOLO_BODY = {2: yolo_body_tiny, 3: yolo_body_full}
@@ -408,6 +408,8 @@ def create_model(input_shape, anchors, num_classes, weights_path=None, model_fac
         'num_classes': num_classes,
         'ignore_thresh': ignore_thresh
     }
+    if not nb_gpu:  # disable all GPUs
+        os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
     # K.clear_session()  # get a new session
     image_input = Input(shape=(None, None, 3))
@@ -443,22 +445,22 @@ def create_model(input_shape, anchors, num_classes, weights_path=None, model_fac
 
     logging.debug(model.summary(line_length=120))
 
-    if gpu_num >= 2:
-        model = multi_gpu_model(model, gpus=gpu_num)
+    if nb_gpu >= 2:
+        model = multi_gpu_model(model, gpus=nb_gpu)
 
     return model
 
 
 def create_model_tiny(input_shape, anchors, num_classes, weights_path=None,
-                      freeze_body=2, ignore_thresh=0.5, gpu_num=1):
+                      freeze_body=2, ignore_thresh=0.5, nb_gpu=1):
     """create the training model, for Tiny YOLOv3 """
 
     return create_model(input_shape, anchors, num_classes, weights_path, model_factor=2,
-                        freeze_body=freeze_body, ignore_thresh=ignore_thresh, gpu_num=gpu_num)
+                        freeze_body=freeze_body, ignore_thresh=ignore_thresh, nb_gpu=nb_gpu)
 
 
 def create_model_bottleneck(input_shape, anchors, num_classes, freeze_body=2,
-                            weights_path=None, gpu_num=1):
+                            weights_path=None, nb_gpu=1):
     """create the training model"""
     # K.clear_session()  # get a new session
     image_input = Input(shape=(None, None, 3))
@@ -476,6 +478,8 @@ def create_model_bottleneck(input_shape, anchors, num_classes, freeze_body=2,
         'num_classes': num_classes,
         'ignore_thresh': 0.5
     }
+    if not nb_gpu:  # disable all GPUs
+        os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
     model_body = yolo_body_full(image_input, num_anchors // 3, num_classes)
     logging.info('Create YOLOv3 model with %i anchors and %i classes.',
@@ -518,8 +522,8 @@ def create_model_bottleneck(input_shape, anchors, num_classes, freeze_body=2,
     model_loss = fn_loss([*model_body.output, *y_true])
     model = Model([model_body.input, *y_true], model_loss)
 
-    if gpu_num >= 2:
-        model = multi_gpu_model(model, gpus=gpu_num)
-        model_bottleneck = multi_gpu_model(model_bottleneck, gpus=gpu_num)
+    if nb_gpu >= 2:
+        model = multi_gpu_model(model, gpus=nb_gpu)
+        model_bottleneck = multi_gpu_model(model_bottleneck, gpus=nb_gpu)
 
     return model, model_bottleneck, last_layer_model

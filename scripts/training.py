@@ -120,7 +120,7 @@ def _export_model(model, path_output, name_prefix, name_sufix):
 
 
 def _main(path_dataset, path_anchors, path_weights=None, path_output='.',
-          path_config=None, path_classes=None, gpu_num=1, **kwargs):
+          path_config=None, path_classes=None, nb_gpu=1, **kwargs):
 
     config = load_config(path_config, DEFAULT_CONFIG)
     anchors = get_anchors(path_anchors)
@@ -133,7 +133,7 @@ def _main(path_dataset, path_anchors, path_weights=None, path_output='.',
     _create_model = create_model_tiny if is_tiny_version else create_model
     name_prefix = 'tiny-' if is_tiny_version else ''
     model = _create_model(config['image-size'], anchors, nb_classes, freeze_body=2,
-                          weights_path=path_weights, gpu_num=gpu_num)
+                          weights_path=path_weights, nb_gpu=nb_gpu)
 
     tb_logging = TensorBoard(log_dir=path_output)
     checkpoint = ModelCheckpoint(os.path.join(path_output, NAME_CHECKPOINT),

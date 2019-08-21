@@ -52,12 +52,12 @@ def loop_detect_video(yolo, path_output=None):
         predict_video(yolo, vid_path, path_output)
 
 
-def _main(path_weights, path_anchors, model_image_size, path_classes, gpu_num,
+def _main(path_weights, path_anchors, model_image_size, path_classes, nb_gpu,
           path_output=None, images=False, videos=False):
     assert images or videos, 'nothing to do...'
 
     yolo = YOLO(path_weights, path_anchors, path_classes, model_image_size,
-                gpu_num=gpu_num)
+                nb_gpu=nb_gpu)
 
     if images:
         # Image detection mode, disregard any remaining command line arguments

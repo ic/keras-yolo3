@@ -44,8 +44,8 @@ def arg_params_yolo():
                         help='input image size for the model')
     parser.add_argument('-c', '--path_classes', type=str,
                         help='path to class definitions')
-    parser.add_argument('--gpu_num', type=int, help='Number of GPU to use',
-                        default=str(YOLO.get_defaults("gpu_num")))
+    parser.add_argument('--nb_gpu', type=int, help='Number of GPU to use',
+                        default=str(YOLO.get_defaults("nb_gpu")))
     parser.add_argument('-o', '--path_output', required=False, type=str, default='.',
                         help='path to the output directory')
     return parser
@@ -147,11 +147,11 @@ def predict_video(yolo, path_video, path_output=None):
 
 
 def _main(path_weights, path_anchors, model_image_size, path_classes, path_output,
-          gpu_num=0, **kwargs):
+          nb_gpu=0, **kwargs):
 
     yolo = YOLO(weights_path=path_weights, anchors_path=path_anchors,
                 classes_path=path_classes, model_image_size=model_image_size,
-                gpu_num=gpu_num)
+                nb_gpu=nb_gpu)
 
     logging.info('Start image/video processing..')
     if 'path_image' in kwargs:

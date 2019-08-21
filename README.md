@@ -43,7 +43,7 @@ For more model and configuration please see  [YOLO website](http://pjreddie.com/
        --path_video person.mp4
     ```
     For Full YOLOv3, just do in a similar way, just specify model path and anchor path with `--path_weights <model_file>` and `--path_anchors <anchor_file>`.
-4. MultiGPU usage: use `--gpu_num N` to use N GPUs. It is passed to the Keras [multi_gpu_model()](https://keras.io/utils/#multi_gpu_model).
+4. MultiGPU usage: use `--nb_gpu N` to use N GPUs. It is passed to the Keras [multi_gpu_model()](https://keras.io/utils/#multi_gpu_model).
 
 ---
 

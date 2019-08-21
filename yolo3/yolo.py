@@ -50,7 +50,7 @@ class YOLO(object):
         "score": 0.3,
         "iou": 0.45,
         "model_image_size": (416, 416),
-        "gpu_num": 1,
+        "nb_gpu": 1,
     }
 
     @classmethod
@@ -60,7 +60,7 @@ class YOLO(object):
         return cls._DEFAULT_PARAMS.get(name)
 
     def __init__(self, weights_path, anchors_path, classes_path, model_image_size,
-                 score=0.3, iou=0.45, gpu_num=1, **kwargs):
+                 score=0.3, iou=0.45, nb_gpu=1, **kwargs):
         """
 
         :param str weights_path: path to loaded model weights, e.g. 'model_data/tiny-yolo.h5'
@@ -69,7 +69,7 @@ class YOLO(object):
         :param float score: confidence score
         :param float iou:
         :param tuple(int,int) model_image_size: e.g. for tiny (416, 416)
-        :param int gpu_num:
+        :param int nb_gpu:
         :param kwargs:
         """
         self.__dict__.update(kwargs)  # and update with user overrides
@@ -79,7 +79,10 @@ class YOLO(object):
         self.score = score
         self.iou = iou
         self.model_image_size = model_image_size
-        self.gpu_num = gpu_num
+        self.nb_gpu = nb_gpu
+        if not self.nb_gpu:
+            # disable all GPUs
+            os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
         self.class_names = get_class_names(self.classes_path)
         self.anchors = get_anchors(self.anchors_path)
         self._open_session()
@@ -136,8 +139,8 @@ class YOLO(object):
 
         # Generate output tensor targets for filtered bounding boxes.
         self.input_image_shape = K.placeholder(shape=(2,))
-        if self.gpu_num >= 2:
-            self.yolo_model = multi_gpu_model(self.yolo_model, gpus=self.gpu_num)
+        if self.nb_gpu >= 2:
+            self.yolo_model = multi_gpu_model(self.yolo_model, gpus=self.nb_gpu)
 
         boxes, scores, classes = yolo_eval(self.yolo_model.output,
                                            self.anchors,
