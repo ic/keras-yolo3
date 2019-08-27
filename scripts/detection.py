@@ -96,7 +96,10 @@ def predict_image(yolo, path_image, path_output=None):
 
 
 def predict_video(yolo, path_video, path_output=None):
-    path_video = update_path(path_video)
+    try:
+        path_video = int(path_video)
+    except Exception:  # not using web cam
+        path_video = update_path(path_video)
     # Create a video capture object to read videos
     try:
         video = cv2.VideoCapture(path_video)
