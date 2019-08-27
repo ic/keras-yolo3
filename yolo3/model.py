@@ -394,7 +394,8 @@ def yolo_loss(args, anchors, num_classes, ignore_thresh=0.5, print_loss=False):
             loss = tf.Print(loss, [loss, xy_loss, wh_loss, confidence_loss,
                                    class_loss, K.sum(ignore_mask)],
                             message='loss: ')
-    return loss
+    # see: https://github.com/qqwweee/keras-yolo3/issues/129#issuecomment-408855511
+    return K.expand_dims(loss, axis=0)
 
 
 def create_model(input_shape, anchors, num_classes, weights_path=None, model_factor=3,

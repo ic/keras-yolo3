@@ -151,7 +151,8 @@ def _main(path_dataset, path_anchors, path_weights=None, path_output='.',
 
     # Train with frozen layers first, to get a stable loss.
     # Adjust num epochs to your dataset. This step is enough to obtain a not bad model.
-    _yolo_loss = lambda y_true, y_pred: y_pred  # use custom yolo_loss Lambda layer.
+    # See: https://github.com/qqwweee/keras-yolo3/issues/129#issuecomment-408855511
+    _yolo_loss = lambda y_true, y_pred: y_pred[0]  # use custom yolo_loss Lambda layer.
     _data_generator = partial(data_generator,
                               input_shape=config['image-size'],
                               anchors=anchors,
@@ -176,7 +177,7 @@ def _main(path_dataset, path_anchors, path_weights=None, path_output='.',
                             epochs=config['epochs']['body'],
                             use_multiprocessing=False,
                             initial_epoch=0,
-                            callbacks=[tb_logging, checkpoint])
+                            callbacks=[tb_logging, checkpoint, reduce_lr, early_stopping])
         logging.info('Training took %f minutes', (time.time() - t_start) / 60.)
         _export_model(model, path_output, name_prefix, '_body')
 

@@ -2,7 +2,8 @@ image-size: [416, 416]
 batch-size:
   bottlenecks: 16
   body: 16
-  fine: 16
+  # the unfreezed model takes more memory
+  fine: 8
 epochs:
   bottlenecks: 25
   body: 50
