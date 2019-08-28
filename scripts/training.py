@@ -163,7 +163,7 @@ def _main(path_dataset, path_anchors, path_weights=None, path_output='.',
     with open(os.path.join(path_output, name_prefix + 'yolo_architect.yaml'), 'w') as fp:
         fp.write(model.to_yaml())
 
-    if config['epochs']['head'] > 0:
+    if config['epochs'].get('head', 0) > 0:
         model.compile(optimizer=Adam(lr=1e-3),
                       loss={'yolo_loss': _yolo_loss})
 

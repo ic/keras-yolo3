@@ -52,10 +52,11 @@ jobs:
             # prepare dataset for usage
             python ./scripts/annotation_voc.py --path_dataset ./model_data/VOCdevkit --classes bicycle car person --sets 2007,train 2007,val --path_output ./model_data
             # prepare very tlim training on 2 and 1 epoch
-            printf "image-size: [416, 416]\nbatch-size:\n  body: 4\n  fine: 4\nepochs:\n  body: 2\n  fine: 1\nvalid-split: 0.2\ngenerator:\n  augument: false\n  nb_threads: 1" > ./model_data/train_tiny-yolo_test.yaml
+            printf "image-size: [416, 416]\nbatch-size:\n  head: 4\n  full: 4\nepochs:\n  head: 2\n  full: 1\nvalid-split: 0.2\ngenerator:\n  augument: false\n  nb_threads: 1" > ./model_data/train_tiny-yolo_test.yaml
             # cut the dataset size
             python -c "lines = open('model_data/VOC_2007_val.txt', 'r').readlines(); open('model_data/VOC_2007_val.txt', 'w').writelines(lines[:250])"
             # start the training
+            cat ./model_data/train_tiny-yolo_test.yaml
             python ./scripts/training.py --path_dataset ./model_data/VOC_2007_val.txt --path_weights ./model_data/tiny-yolo.h5 --path_anchors ./model_data/tiny-yolo_anchors.csv --path_classes ./model_data/voc_classes.txt --path_output ./model_data --path_config ./model_data/train_tiny-yolo_test.yaml
             # use the train model
             python ./scripts/detection.py -w ./model_data/tiny-yolo_weights_final.h5 -a ./model_data/tiny-yolo_anchors.csv --model_image_size 416 416 -c ./model_data/voc_classes.txt -o ./results -i ./model_data/bike-car-dog.jpg
