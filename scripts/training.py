@@ -31,9 +31,9 @@ from scripts.detection import arg_params_yolo
 DEFAULT_CONFIG = {
     'image-size': (416, 416),
     'batch-size':
-        {'body': 16, 'fine': 16},
+        {'head': 16, 'full': 16},
     'epochs':
-        {'body': 50, 'fine': 50},
+        {'head': 50, 'full': 50},
     'valid-split': 0.1,
     'generator': {
         'jitter': 0.3,
@@ -163,18 +163,18 @@ def _main(path_dataset, path_anchors, path_weights=None, path_output='.',
     with open(os.path.join(path_output, name_prefix + 'yolo_architect.yaml'), 'w') as fp:
         fp.write(model.to_yaml())
 
-    if config['epochs']['body'] > 0:
+    if config['epochs']['head'] > 0:
         model.compile(optimizer=Adam(lr=1e-3),
                       loss={'yolo_loss': _yolo_loss})
 
         logging.info('Train on %i samples, val on %i samples, with batch size %i.',
-                     num_train, num_val, config['batch-size']['body'])
+                     num_train, num_val, config['batch-size']['head'])
         t_start = time.time()
-        model.fit_generator(_data_generator(lines_train, batch_size=config['batch-size']['body']),
-                            steps_per_epoch=max(1, num_train // config['batch-size']['body']),
+        model.fit_generator(_data_generator(lines_train, batch_size=config['batch-size']['head']),
+                            steps_per_epoch=max(1, num_train // config['batch-size']['head']),
                             validation_data=_data_generator(lines_valid, augument=False),
-                            validation_steps=max(1, num_val // config['batch-size']['body']),
-                            epochs=config['epochs']['body'],
+                            validation_steps=max(1, num_val // config['batch-size']['head']),
+                            epochs=config['epochs']['head'],
                             use_multiprocessing=False,
                             initial_epoch=0,
                             callbacks=[tb_logging, checkpoint, reduce_lr, early_stopping])
@@ -189,15 +189,15 @@ def _main(path_dataset, path_anchors, path_weights=None, path_output='.',
     model.compile(optimizer=Adam(lr=1e-4),
                   loss={'yolo_loss': _yolo_loss})
     logging.info('Train on %i samples, val on %i samples, with batch size %i.',
-                 num_train, num_val, config['batch-size']['fine'])
+                 num_train, num_val, config['batch-size']['full'])
     t_start = time.time()
-    model.fit_generator(_data_generator(lines_train, batch_size=config['batch-size']['body']),
-                        steps_per_epoch=max(1, num_train // config['batch-size']['fine']),
+    model.fit_generator(_data_generator(lines_train, batch_size=config['batch-size']['head']),
+                        steps_per_epoch=max(1, num_train // config['batch-size']['full']),
                         validation_data=_data_generator(lines_valid, augument=False),
-                        validation_steps=max(1, num_val // config['batch-size']['fine']),
-                        epochs=config['epochs']['body'] + config['epochs']['fine'],
+                        validation_steps=max(1, num_val // config['batch-size']['full']),
+                        epochs=config['epochs']['head'] + config['epochs']['full'],
                         use_multiprocessing=False,
-                        initial_epoch=config['epochs']['body'],
+                        initial_epoch=config['epochs']['head'],
                         callbacks=[tb_logging, checkpoint, reduce_lr, early_stopping])
     logging.info('Training took %f minutes', (time.time() - t_start) / 60.)
     _export_model(model, path_output, name_prefix, '_final')

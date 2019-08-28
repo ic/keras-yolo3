@@ -28,9 +28,9 @@ from scripts.training import parse_params, load_config, load_training_lines, _ex
 DEFAULT_CONFIG = {
     'image-size': (608, 608),
     'batch-size':
-        {'body': 16, 'bottlenecks': 8, 'fine': 16},
+        {'head': 16, 'bottlenecks': 8, 'full': 16},
     'epochs':
-        {'body': 50, 'bottlenecks': 30, 'fine': 50},
+        {'head': 50, 'bottlenecks': 30, 'full': 50},
     'valid-split': 0.1,
     'recompute-bottlenecks': True,
     'generator': {}
@@ -78,7 +78,7 @@ def _main(path_dataset, path_anchors, path_weights=None, path_output='.',
                               nb_classes=nb_classes,
                               **config['generator'])
 
-    if config['epochs']['bottlenecks'] > 0 or config['epochs']['body'] > 0:
+    if config['epochs']['bottlenecks'] > 0 or config['epochs']['head'] > 0:
         # perform bottleneck training
         path_bottlenecks = os.path.join(path_output, NAME_BOTTLENECKS)
         if not os.path.isfile(path_bottlenecks) or config['recompute-bottlenecks']:
@@ -115,14 +115,14 @@ def _main(path_dataset, path_anchors, path_weights=None, path_output='.',
         model.compile(optimizer=Adam(lr=1e-3),
                       loss={'yolo_loss': _yolo_loss})  # use custom yolo_loss Lambda layer.
         logging.info('Train on %i samples, val on %i samples, with batch size %i.',
-                     num_train, num_val, config['batch-size']['body'])
+                     num_train, num_val, config['batch-size']['head'])
         t_start = time.time()
         model.fit_generator(
-            _data_generator(lines_train, batch_size=config['batch-size']['body']),
-            steps_per_epoch=max(1, num_train // config['batch-size']['body']),
-            validation_data=_data_generator(lines_valid, batch_size=config['batch-size']['body']),
-            validation_steps=max(1, num_val // config['batch-size']['body']),
-            epochs=config['epochs']['body'],
+            _data_generator(lines_train, batch_size=config['batch-size']['head']),
+            steps_per_epoch=max(1, num_train // config['batch-size']['head']),
+            validation_data=_data_generator(lines_valid, batch_size=config['batch-size']['head']),
+            validation_steps=max(1, num_val // config['batch-size']['head']),
+            epochs=config['epochs']['head'],
             initial_epoch=0,
             callbacks=[log_tb, checkpoint])
         logging.info('Training took %f minutes', (time.time() - t_start) / 60.)
@@ -130,7 +130,7 @@ def _main(path_dataset, path_anchors, path_weights=None, path_output='.',
 
     # Unfreeze and continue training, to fine-tune.
     # Train longer if the result is not good.
-    if config['epochs']['fine'] > 0:
+    if config['epochs']['full'] > 0:
         for i in range(len(model.layers)):
             model.layers[i].trainable = True
         model.compile(optimizer=Adam(lr=1e-4),
@@ -139,15 +139,15 @@ def _main(path_dataset, path_anchors, path_weights=None, path_output='.',
 
         # note that more GPU memory is required after unfreezing the body
         logging.info('Train on %i samples, val on %i samples, with batch size %i.',
-                     num_train, num_val, config['batch-size']['fine'])
+                     num_train, num_val, config['batch-size']['full'])
         t_start = time.time()
         model.fit_generator(
-            _data_generator(lines_train, batch_size=config['batch-size']['fine']),
-            steps_per_epoch=max(1, num_train // config['batch-size']['fine']),
-            validation_data=_data_generator(lines_valid, batch_size=config['batch-size']['fine']),
-            validation_steps=max(1, num_val // config['batch-size']['fine']),
-            epochs=config['epochs']['fine'],
-            initial_epoch=config['epochs']['body'],
+            _data_generator(lines_train, batch_size=config['batch-size']['full']),
+            steps_per_epoch=max(1, num_train // config['batch-size']['full']),
+            validation_data=_data_generator(lines_valid, batch_size=config['batch-size']['full']),
+            validation_steps=max(1, num_val // config['batch-size']['full']),
+            epochs=config['epochs']['full'],
+            initial_epoch=config['epochs']['head'],
             callbacks=[log_tb, checkpoint, reduce_lr, early_stopping])
         logging.info('Training took %f minutes', (time.time() - t_start) / 60.)
         _export_model(model, path_output, '', '_final')

@@ -1,13 +1,13 @@
 image-size: [416, 416]
 batch-size:
   bottlenecks: 16
-  body: 16
+  head: 16
   # the unfreezed model takes more memory
-  fine: 8
+  full: 8
 epochs:
   bottlenecks: 25
-  body: 50
-  fine: 30
+  head: 50
+  full: 30
 CB_learning-rate:
   factor: 0.05
   patience: 3
