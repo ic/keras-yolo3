@@ -20,8 +20,8 @@ from io import open
 def _parse_requirements(file_path):
     with open(file_path) as fp:
         reqs = [
-            r.rstrip()
-            for r in fp.readlines()
+            r
+            for r in [s.strip() for s in fp.readlines()]
             if not r.startswith('#') and not r.endswith('#dev')
         ]
         return reqs
