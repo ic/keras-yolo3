@@ -19,7 +19,11 @@ from io import open
 # Fields marked as "Optional" may be commented out.
 def _parse_requirements(file_path):
     with open(file_path) as fp:
-        reqs = [r.rstrip() for r in fp.readlines() if not r.startswith('#')]
+        reqs = [
+            r.rstrip()
+            for r in fp.readlines()
+            if not r.startswith('#') and not r.endswith('#dev')
+        ]
         return reqs
 
 

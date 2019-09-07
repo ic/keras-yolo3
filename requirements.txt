@@ -7,7 +7,7 @@ pydot-ng
 graphviz
 tensorflow>=1.4.0
 pandas
-opencv-python
+opencv-python #dev
 tqdm
 pathos
 PyYAML
