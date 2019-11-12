@@ -151,8 +151,8 @@ def augment_image_color(image, hue, sat, val):
     (518, 520, 3)
     """
     hue = _rand(-hue, hue)
-    sat = _rand(1. / sat, sat)
-    val = _rand(1. / val, val)
+    sat = _rand(1 - abs(1 - sat), sat)
+    val = _rand(1 - abs(1 - val), val)
 
     img = rgb_to_hsv(np.array(image) / 255.)
     img[..., 0] += hue
@@ -446,8 +446,8 @@ def get_augmented_data(annotation_line, input_shape, augment=True, max_boxes=20,
     >>> image_data.shape
     (416, 416, 3)
     >>> box_data  # doctest: +ELLIPSIS
-    array([[247.,  39., 330., 163.,   1.],
-           [ 81., 122., 164., 204.,   0.],
+    array([[243.,  39., 325., 162.,   1.],
+           [ 80., 121., 162., 202.,   0.],
            [  0.,   0.,   0.,   0.,   0.],
            ...
            [  0.,   0.,   0.,   0.,   0.]])
@@ -469,7 +469,7 @@ def get_augmented_data(annotation_line, input_shape, augment=True, max_boxes=20,
     # resize image
     # new_ar = cnn_w / cnn_h * _rand(1 - jitter, 1 + jitter) / _rand(1 - jitter, 1 + jitter)
     if resize_img:
-        scaling = _rand(1. / img_scaling, img_scaling) if augment else 1.
+        scaling = _rand(1 - abs(1 - img_scaling), img_scaling) if augment else 1.
         img_data, scaling, (dx, dy) = _scale_image_to_cnn(
             image, input_shape, scaling, allow_rnd_shift=allow_rnd_shift, interp=interp)
     else:
