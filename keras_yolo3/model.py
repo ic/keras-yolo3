@@ -7,6 +7,7 @@ import logging
 from functools import wraps
 
 import numpy as np
+from scipy.optimize import linear_sum_assignment
 import tensorflow as tf
 import keras.backend as K
 from keras.layers import Conv2D, Add, ZeroPadding2D, UpSampling2D, Concatenate, MaxPooling2D
@@ -296,11 +297,16 @@ def compute_tp_fp_fn(boxes_true, boxes_pred, iou_thresh=0.5):
     * True Positive (TP): A correct detection. Detection with IOU ≥ threshold
     * False Positive (FP): A wrong detection. Detection with IOU < threshold
     * False Negative (FN): A ground truth not detected
-    * True Negative (TN): Does not apply. It would represent a corrected misdetection.
+    * True Negative (TN): Does not apply. It would represent a corrected miss-detection.
        In the object detection task there are many possible bounding boxes
        that should not be detected within an image. Thus, TN would be all possible bounding
-       boxes that were corrrectly not detected (so many possible boxes within an image).
+       boxes that were correctly not detected (so many possible boxes within an image).
        That's why it is not used by the metrics.
+
+    See:
+    - https://medium.com/@jonathan_hui/map-mean-average-precision-for-object-detection-45c121a31173
+    - https://github.com/rafaelpadilla/Object-Detection-Metrics
+    - https://github.com/MathGaron/mean_average_precision
 
     :param list boxes_true:
     :param list boxes_pred:
@@ -310,23 +316,30 @@ def compute_tp_fp_fn(boxes_true, boxes_pred, iou_thresh=0.5):
     >>> b_true = [[5, 10, 15, 20], [10, 15, 20, 25], [30, 35, 40, 45]]
     >>> b_pred = [[5, 10, 15, 15], [10, 10, 20, 20], [10, 5, 20, 25], [10, 10, 20, 25]]
     >>> compute_tp_fp_fn(b_true, b_pred)
-    (3, 1, 1)
+    (2, 2, 1)
     """
     if len(boxes_pred) == 0:
         return 0, 0, len(boxes_true)
     if len(boxes_true) == 0:
         return 0, len(boxes_pred), 0
 
-    mx = np.zeros((len(boxes_true), len(boxes_pred)))
+    matching = np.zeros((len(boxes_true), len(boxes_pred)))
     for i, bt in enumerate(boxes_true):
         for j, bp in enumerate(boxes_pred):
-            mx[i, j] = box_iou_xyxy(bt, bp)
+            matching[i, j] = box_iou_xyxy(bt, bp)
 
-    best_pred = np.max(mx, axis=0)
-    tp = sum(best_pred >= iou_thresh)
-    fp = sum(best_pred < iou_thresh)
-    best_true = np.max(mx, axis=1)
-    fn = sum(best_true < iou_thresh)
+    # drop all to low matches
+    matching[matching < iou_thresh] = 0
+    # filter too low pairing in columns and rows
+    matching = matching[:, np.sum(matching, axis=0) > 0]
+    matching = matching[np.sum(matching, axis=1) > 0, :]
+    # use hungarian algorithm to find pairing between true - predict
+    pairing = linear_sum_assignment(1.0 - matching)
+
+    # basic metrics
+    tp = len(pairing[0])
+    fp = len(boxes_pred) - tp
+    fn = len(boxes_true) - tp
     return tp, fp, fn
 
 
@@ -334,10 +347,9 @@ def compute_detect_metrics(boxes_true, boxes_pred, iou_thresh=0.5):
     """compute metrics: precision, recall, ...
 
     **Precision** is the ability of a model to identify only the relevant objects.
-     It is the percentage of correct positive predictions.
-    **Recall** is the ability of a model to find all the relevant cases
-     (all ground truth bounding boxes). It is the percentage of true positive detected
-     among all relevant ground truths.
+     It is the percentage of correct positive predictions = TP / (TP + FP)
+    **Recall** is the ability of a model to find all the relevant cases (all ground truth bounding boxes).
+     It is the percentage of true positive detected among all relevant ground truths = TP / (TP + FN)
 
     See: https://github.com/rafaelpadilla/Object-Detection-Metrics
 
@@ -351,9 +363,9 @@ def compute_detect_metrics(boxes_true, boxes_pred, iou_thresh=0.5):
     >>> stat = compute_detect_metrics(b_true, b_pred)
     >>> import pandas as pd
     >>> pd.DataFrame(stat)[list(sorted(stat[0]))]  # doctest: +NORMALIZE_WHITESPACE
-       #annots  #predict  FN  FP  class  precision  recall
-    0      2.0       3.0   0   1      0   0.666667     1.0
-    1      1.0       1.0   1   1      1   0.000000     0.0
+       #annots  #predict  FN  FP  class  f1-score  precision  recall
+    0      2.0       3.0   0   1      0       0.8   0.666667     1.0
+    1      1.0       1.0   1   1      1       0.0   0.000000     0.0
     """
 
     boxes_true = np.asanyarray(boxes_true)
@@ -369,10 +381,16 @@ def compute_detect_metrics(boxes_true, boxes_pred, iou_thresh=0.5):
         tp, fp, fn = compute_tp_fp_fn(b_true, b_pred, iou_thresh)
         nb_true = float(len(b_true))
         nb_pred = float(len(b_pred))
+        precis = tp / nb_pred if tp else 0.
+        assert 0 <= precis <= 1
+        recall = tp / nb_true if tp else 0.
+        assert 0 <= recall <= 1
+        f1 = 2 * (precis * recall) / (precis + recall) if (precis + recall) else 0.
         stats.append({
             'class': cls,
-            'precision': tp / nb_pred if nb_pred else 0.,
-            'recall': tp / nb_true if nb_true else 0.,
+            'precision': precis,
+            'recall': recall,
+            'f1-score': f1,
             'FP': fp,
             'FN': fn,
             '#annots': nb_true,

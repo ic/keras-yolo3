@@ -1,4 +1,5 @@
 numpy
+scipy
 matplotlib<3.0.0  # dropped support for py3.5 and lower
 Pillow
 # keras!=2.2.3,2.2.4 # crash multi GPU training, see https://github.com/keras-team/keras/issues/11348

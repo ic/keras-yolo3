@@ -40,7 +40,7 @@ references:
       name: Detection
       command: |
         # download sample video
-        wget -O ./results/volleyball.mp4  https://d2v9y0dukr6mq2.cloudfront.net/video/preview/UnK3Qzg/crowds-of-poeple-hot-summer-day-at-wasaga-beach-ontario-canada-during-heatwave_n2t3d8trl__SB_PM.mp4
+        wget -O ./results/volleyball.mp4  https://www.dropbox.com/s/gt6cv49zm1v808q/volleyball.mp4?dl=0
         # run sample detections
         python ./scripts/detection.py -w ./model_data/tiny-yolo.h5 -a ./model_data/tiny-yolo_anchors.csv -c ./model_data/coco_classes.txt -o ./results -i ./model_data/bike-car-dog.jpg -v ./results/volleyball.mp4
         ls -l results/*
