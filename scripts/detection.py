@@ -184,7 +184,7 @@ def _main(path_weights, path_anchors, path_classes, path_output, nb_gpu=0, **kwa
             logging.debug('processing: "%s"', path_img)
             predict_image(yolo, path_img, path_output)
     if 'path_video' in kwargs:
-        paths_vid = expand_file_paths(kwargs['path_image'])
+        paths_vid = expand_file_paths(kwargs['path_video'])
         for path_vid in tqdm.tqdm(paths_vid, desc='videos'):
             logging.debug('processing: "%s"', path_vid)
             predict_video(yolo, path_vid, path_output)
