@@ -1,4 +1,4 @@
-# keras-yolo3
+# Keras: YOLO v3
 
 [![Build Status](https://travis-ci.org/Borda/keras-yolo3.svg?branch=master)](https://travis-ci.org/Borda/keras-yolo3)
 [![Build status](https://ci.appveyor.com/api/projects/status/24m00vife2wae7k0/branch/master?svg=true)](https://ci.appveyor.com/project/Borda/keras-yolo3/branch/master)
@@ -10,7 +10,14 @@
 
 ## Introduction
 
-A [Keras](https://keras.io/) implementation of YOLOv3 ([Tensorflow backend](https://www.tensorflow.org/)) inspired by [allanzelener/YAD2K](https://github.com/allanzelener/YAD2K).
+A [Keras](https://keras.io/) implementation of YOLOv3 ([Tensorflow backend](https://www.tensorflow.org/)) inspired by [allanzelener/YAD2K](https://github.com/allanzelener/YAD2K). This fork is a continuation of [qqwweee/keras-yolo3](https://github.com/qqwweee/keras-yolo3) with some CI and bug fixing since its parent become inactive...
+
+For package installation use of the following commands
+```bash
+pip install git+https://github.com/Borda/keras-yolo3.git
+pip install https://github.com/Borda/keras-yolo3/archive/master.zip
+```
+or clone/download repository locally and run `python setup.py install`
 
 ---
 
@@ -55,11 +62,10 @@ For training you can use [VOC dataset](http://host.robots.ox.ac.uk/pascal/VOC/),
     * One row for one image;  
     * Row format: `image_file_path box1 box2 ... boxN`;  
     * Box format: `x_min,y_min,x_max,y_max,class_id` (no space).  
-    * For VOC dataset.  
-    Run one of following scrips for dataset conversion 
-    * `scripts/annotation_voc.py` 
-    * `scripts/annotation_coco.py` 
-    * `scripts/annotation_csv.py`  
+    * Run one of following scrips for dataset conversion 
+        - `scripts/annotation_voc.py` 
+        - `scripts/annotation_coco.py` 
+        - `scripts/annotation_csv.py`  
     Here is an example:
     ```text
     path/to/img1.jpg 50,100,150,200,0 30,50,200,120,3
@@ -82,10 +88,17 @@ If you want to use original pre-trained weights for YOLOv3:
 
 ## Some issues to know
 
-1. The test environment is Python 3.5.2 ; Keras 2.1.5 ; tensorflow 1.6.0
+1. The test environment is Python 3.x ; Keras 2.2.0 ; tensorflow 1.14.0
 2. Default anchors are used. If you use your own anchors, probably some changes are needed.
 3. The inference result is not totally the same as Darknet but the difference is small.
-4. The speed is slower than Darknet. Replacing PIL with opencv may help a little.
-5. Always load pretrained weights and freeze layers in the first stage of training. Or try Darknet training. It's OK if there is a mismatch warning.
-6. The training strategy is for reference only. Adjust it according to your dataset and your goal. and add further strategy if needed.
-7. For speeding up the training process with frozen layers train_bottleneck.py can be used. It will compute the bottleneck features of the frozen model first and then only trains the last layers. This makes training on CPU possible in a reasonable time. See this [post](https://blog.keras.io/building-powerful-image-classification-models-using-very-little-data.html) for more information on bottleneck features.
+4. Always load pretrained weights and freeze layers in the first stage of training. Or try Darknet training. It's OK if there is a mismatch warning.
+5. The training strategy is for reference only. Adjust it according to your dataset and your goal. and add further strategy if needed.
+6. For speeding up the training process with frozen layers train_bottleneck.py can be used. It will compute the bottleneck features of the frozen model first and then only trains the last layers. This makes training on CPU possible in a reasonable time. See this [post](https://blog.keras.io/building-powerful-image-classification-models-using-very-little-data.html) for more information on bottleneck features.
+7. Failing while run multi-GPU training, think about porting to TF 2.0.
+
+---
+
+## Nice reading
+
+- [Building efficient data pipelines using TensorFlow](https://towardsdatascience.com/building-efficient-data-pipelines-using-tensorflow-8f647f03b4ce)
+- [How to use half precision float16 when training on RTX cards with Tensorflow / Keras](https://medium.com/@noel_kennedy/how-to-use-half-precision-float16-when-training-on-rtx-cards-with-tensorflow-keras-d4033d59f9e4)

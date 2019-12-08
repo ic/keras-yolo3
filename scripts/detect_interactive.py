@@ -15,8 +15,8 @@ import sys
 import logging
 
 sys.path += [os.path.abspath('.'), os.path.abspath('..')]
-from yolo3.yolo import YOLO
-from yolo3.utils import update_path
+from keras_yolo3.yolo import YOLO
+from keras_yolo3.utils import update_path
 from scripts.detection import predict_image, predict_video, arg_params_yolo
 
 
@@ -25,9 +25,11 @@ def parse_params():
     parser = arg_params_yolo()
     parser.add_argument('--images', default=False, action='store_true',
                         help='Image detection mode.')
-    # Command line positional arguments -- for video detection mode
     parser.add_argument('--videos', default=False, action='store_true',
-                        help='Image detection mode.')
+                        help='Video detection mode.')
+    parser.add_argument('--stream', default=False, action='store_true',
+                        help='Detection from stream.')
+
     arg_params = vars(parser.parse_args())
     for k in (k for k in arg_params if 'path' in k):
         arg_params[k] = update_path(arg_params[k])
@@ -46,27 +48,36 @@ def loop_detect_image(yolo, path_output=None):
 
 def loop_detect_video(yolo, path_output=None):
     while True:
-        vid_path = input('Input image filename:')
+        vid_path = input('Input video filename:')
         if vid_path.lower() == 'exit':
             return
-        predict_video(yolo, vid_path, path_output)
+        predict_video(yolo, vid_path, path_output, show_stream=False)
 
 
-def _main(path_weights, path_anchors, model_image_size, path_classes, nb_gpu,
-          path_output=None, images=False, videos=False):
-    assert images or videos, 'nothing to do...'
+def loop_detect_stream(yolo, path_output=None):
+    while True:
+        vid_path = input('Input stream:')
+        if vid_path.lower() == 'exit':
+            return
+        predict_video(yolo, vid_path, path_output, show_stream=True)
 
-    yolo = YOLO(path_weights, path_anchors, path_classes, model_image_size,
-                nb_gpu=nb_gpu)
+
+def _main(path_weights, path_anchors, path_classes, nb_gpu,
+          path_output=None, images=False, videos=False, stream=False):
+    assert any([images, videos, stream]), 'nothing to do...'
+
+    yolo = YOLO(path_weights, path_anchors, path_classes, nb_gpu=nb_gpu)
 
     if images:
         # Image detection mode, disregard any remaining command line arguments
         logging.info('Image detection mode')
         loop_detect_image(yolo, path_output)
-
-    if videos:
+    elif videos:
         logging.info('Video detection mode')
         loop_detect_video(yolo, path_output)
+    elif stream:
+        logging.info('Video detection mode')
+        loop_detect_stream(yolo, path_output)
 
 
 if __name__ == '__main__':

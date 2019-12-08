@@ -2,7 +2,7 @@ image-size: [416, 416]
 batch-size:
   bottlenecks: 16
   head: 16
-  # the unfreezed model takes more memory
+  # the unfreeze model takes more memory
   full: 8
 epochs:
   bottlenecks: 25
@@ -16,12 +16,24 @@ CB_stopping:
   patience: 25
 valid-split: 0.1
 generator:
+  # maximal number of detection in image
+  max_boxes: 20
   jitter: 0.3
-  color_hue: 0.1
-  color_sat: 1.5
-  color_val: 1.5
+  color_hue: 0.15
+  color_sat: 1.4
+  color_val: 1.4
+  # image flopping
   flip_horizontal: true
   flip_vertical: false
-  resize_img: true
+  # allow resize image to CNN frame, otherwise make a cuts
+  resize_img: false
+  # scaling in +/- this range
+  img_scaling: 1.15
+  # when a image is resized to CNN and there is a padding
+  #  then do not center but random up/down for landscape and right/left for portrait
+  allow_rnd_shift: true
+  # in case cut image (zoom) drop all boxes with lower overlap
+  bbox_overlap: 0.75
+  # number of parallel threads/processes for data/image generating
   nb_threads: 0.9
 recompute-bottlenecks: false

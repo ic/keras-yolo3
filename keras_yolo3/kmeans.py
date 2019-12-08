@@ -1,14 +1,32 @@
 """
-
+Clustering of bounding boxes
 """
 
+import os
 import logging
 
 import numpy as np
 import pandas as pd
+import tqdm
 
 
 class YOLO_Kmeans:
+    """Clustering of boxes width and height
+
+    Simplified version without file I/O
+
+    >>> np.random.seed(0)
+    >>> boxes = np.random.randint(50, 250, (100, 2))
+    >>> clust = YOLO_Kmeans(cluster_number=3, filename=None)
+    >>> result = clust.fit(boxes, k=clust.cluster_number)
+    >>> result = result[np.lexsort(result.T[0, None])]
+    >>> result
+    array([[ 99, 192],
+           [147,  81],
+           [198, 179]])
+    >>> clust.avg_iou(boxes, result)  # doctest: +ELLIPSIS
+    0.688...
+    """
 
     def __init__(self, cluster_number, filename):
         self.cluster_number = cluster_number
@@ -42,58 +60,49 @@ class YOLO_Kmeans:
         accuracy = np.mean([np.max(self.iou(boxes, clusters), axis=1)])
         return accuracy
 
-    def kmeans(self, boxes, k, dist=np.median):
+    def fit(self, boxes, k, dist=np.median):
         box_number = boxes.shape[0]
         # distances = np.empty((box_number, k))
         last_nearest = np.zeros((box_number,))
-        np.random.seed()
-        clusters = boxes[np.random.choice(
-            box_number, k, replace=False)]  # init k clusters
+        clusters = boxes[np.random.choice(box_number, k, replace=False)]  # init k clusters
+
         while True:
-
             distances = 1 - self.iou(boxes, clusters)
-
             current_nearest = np.argmin(distances, axis=1)
             if (last_nearest == current_nearest).all():
                 break  # clusters won't change
             for cluster in range(k):
                 clusters[cluster] = dist(  # update clusters
                     boxes[current_nearest == cluster], axis=0)
-
             last_nearest = current_nearest
 
         return clusters
 
-    @staticmethod
-    def result2txt(data, file_name='yolo_anchors.csv'):
-        pd.DataFrame(data).to_csv(file_name, header=None, index=None)
+    def result2csv(self, data, path_out):
+        name, _ = os.path.splitext(os.path.basename(self.filename))
+        path_csv = os.path.join(path_out, name + '_anchors.csv')
+        logging.debug('Export CSV: %s', path_csv)
+        pd.DataFrame(data, dtype=int).to_csv(path_csv, header=None, index=None)
 
     def txt2boxes(self):
         with open(self.filename, 'r') as fp:
             lines = fp.readlines()
-        dataSet = []
-        for line in lines:
-            infos = line.split(' ')
-            length = len(infos)
-            for i in range(1, length):
-                split_info = [int(x) for x in infos[i].split(',')]
-                width = split_info[2] - split_info[0]
-                height = split_info[3] - split_info[1]
-                dataSet.append([width, height])
-        result = np.array(dataSet)
-        return result
+        dataset = []
+        for line in tqdm.tqdm(lines, desc='Extract bboxes'):
+            infos = line.strip().split(' ')
+            for bbox in infos[1:]:
+                box = list(map(float, bbox.split(',')))
+                width = box[2] - box[0]
+                height = box[3] - box[1]
+                dataset.append([width, height])
+        bboxes_wh = np.array(dataset)
+        return bboxes_wh
 
-    def txt2clusters(self):
+    def txt2clusters(self, path_out):
         all_boxes = self.txt2boxes()
-        result = self.kmeans(all_boxes, k=self.cluster_number)
+        result = self.fit(all_boxes, k=self.cluster_number)
         result = result[np.lexsort(result.T[0, None])]
-        self.result2txt(result)
+        self.result2csv(result, path_out)
         logging.info('K anchors:\n %s', repr(result))
         logging.info('Accuracy: %f', self.avg_iou(all_boxes, result) * 100)
-
-
-if __name__ == "__main__":
-    cluster_number = 9
-    filename = '2012_train.txt'
-    kmeans = YOLO_Kmeans(cluster_number, filename)
-    kmeans.txt2clusters()
+        return result

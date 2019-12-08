@@ -31,7 +31,7 @@ from collections import defaultdict
 
 import tqdm
 import numpy as np
-from keras import backend as K
+import keras.backend as K
 from keras.layers import (Conv2D, Input, ZeroPadding2D, Add,
                           UpSampling2D, MaxPooling2D, Concatenate)
 from keras.layers.advanced_activations import LeakyReLU
@@ -41,7 +41,7 @@ from keras.regularizers import l2
 from keras.utils.vis_utils import plot_model as plot
 
 sys.path += [os.path.abspath('.'), os.path.abspath('..')]
-from yolo3.utils import update_path
+from keras_yolo3.utils import update_path
 
 
 def parse_arguments():
@@ -106,7 +106,7 @@ def parse_convolutional(all_layers, cfg_parser, section, prev_layer, weights_fil
     weights_size = np.product(weights_shape)
 
     s_bn = 'bn' if batch_normalize else '  '
-    logging.info('conv2d: %s, %s, %s', s_bn, activation, repr(weights_shape))
+    logging.debug('conv2d: %s, %s, %s', s_bn, activation, repr(weights_shape))
 
     conv_bias = np.ndarray(shape=(filters,), dtype='float32',
                            buffer=weights_file.read(filters * 4))
@@ -263,16 +263,18 @@ def _main(config_path, weights_path, output_path, weights_only, plot_model):
     cfg_parser.read_file(unique_config_file)
 
     logging.info('Creating Keras model.')
-    input_layer = Input(shape=(None, None, 3))
+    cnn_w = int(cfg_parser['net_0']['width'])
+    cnn_h = int(cfg_parser['net_0']['height'])
+    input_layer = Input(shape=(cnn_h, cnn_w, 3))
     prev_layer = input_layer
     all_layers = []
 
-    weight_decay = float(cfg_parser['net_0']['decay']
-                         ) if 'net_0' in cfg_parser.sections() else 5e-4
+    weight_decay = float(cfg_parser['net_0']['decay']) \
+        if 'net_0' in cfg_parser.sections() else 5e-4
     count = 0
     out_index = []
     for section in tqdm.tqdm(cfg_parser.sections()):
-        logging.info('Parsing section "%s"', section)
+        logging.debug('Parsing section "%s"', section)
         (all_layers, cfg_parser, section, prev_layer,
          weights_file, count, weight_decay, out_index) = parse_section(
             all_layers, cfg_parser, section, prev_layer,
@@ -304,7 +306,7 @@ def _main(config_path, weights_path, output_path, weights_only, plot_model):
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
     arg_params = parse_arguments()
     _main(**arg_params)
     logging.info('DONE.')

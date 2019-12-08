@@ -6,8 +6,10 @@ import os
 import logging
 from functools import wraps
 
+import numpy as np
+from scipy.optimize import linear_sum_assignment
 import tensorflow as tf
-from keras import backend as K
+import keras.backend as K
 from keras.layers import Conv2D, Add, ZeroPadding2D, UpSampling2D, Concatenate, MaxPooling2D
 from keras.layers import Input, Lambda
 from keras.layers.advanced_activations import LeakyReLU
@@ -16,7 +18,7 @@ from keras.models import Model
 from keras.regularizers import l2
 from keras.utils import multi_gpu_model
 
-from yolo3.utils import compose, update_path
+from keras_yolo3.utils import compose, update_path
 
 
 @wraps(Conv2D)
@@ -256,13 +258,155 @@ def yolo_eval(yolo_outputs, anchors, num_classes, image_shape, max_boxes=20,
     return boxes_, scores_, classes_
 
 
-def box_iou(b1, b2):
+def box_iou_xyxy(box1, box2):
+    """intersection over union
+
+    :param list box1:
+    :param list box2:
+    :return float:
+
+    >>> box_iou_xyxy([5, 10, 15, 20], [10, 15, 20, 25])  # docstest: +ELLIPSIS
+    0.14...
+    >>> box_iou_xyxy([5, 10, 15, 20], [30, 35, 40, 45])
+    0.0
+    >>> box_iou_xyxy([10, 15, 20, 25], [10, 15, 20, 25])
+    1.0
+    """
+    box1 = np.asanyarray(box1)
+    box2 = np.asanyarray(box2)
+    b1_wh = box1[2:4] - box1[0:2]
+    b2_wh = box2[2:4] - box2[0:2]
+    b_max_of_min = np.max([box1[0:2], box2[0:2]], axis=0)
+    b_min_of_max = np.min([box1[2:4], box2[2:4]], axis=0)
+
+    inter_wh = b_min_of_max - b_max_of_min
+    inter_wh[inter_wh < 0] = 0
+    inter_area = np.prod(inter_wh)
+
+    iou = inter_area / (np.prod(b1_wh) + np.prod(b2_wh) - inter_area)
+    return iou
+
+
+def compute_tp_fp_fn(boxes_true, boxes_pred, iou_thresh=0.5):
+    """compute basic metrics: TP, FP, TN
+
+    https://github.com/rafaelpadilla/Object-Detection-Metrics
+
+    Some basic concepts used by the metrics:
+
+    * True Positive (TP): A correct detection. Detection with IOU ≥ threshold
+    * False Positive (FP): A wrong detection. Detection with IOU < threshold
+    * False Negative (FN): A ground truth not detected
+    * True Negative (TN): Does not apply. It would represent a corrected miss-detection.
+       In the object detection task there are many possible bounding boxes
+       that should not be detected within an image. Thus, TN would be all possible bounding
+       boxes that were correctly not detected (so many possible boxes within an image).
+       That's why it is not used by the metrics.
+
+    See:
+    - https://medium.com/@jonathan_hui/map-mean-average-precision-for-object-detection-45c121a31173
+    - https://github.com/rafaelpadilla/Object-Detection-Metrics
+    - https://github.com/MathGaron/mean_average_precision
+
+    :param list boxes_true:
+    :param list boxes_pred:
+    :param float iou_thresh:
+    :return tuple(int,int,int):
+
+    >>> b_true = [[5, 10, 15, 20], [10, 15, 20, 25], [30, 35, 40, 45]]
+    >>> b_pred = [[5, 10, 15, 15], [10, 10, 20, 20], [10, 5, 20, 25], [10, 10, 20, 25]]
+    >>> compute_tp_fp_fn(b_true, b_pred)
+    (2, 2, 1)
+    """
+    if len(boxes_pred) == 0:
+        return 0, 0, len(boxes_true)
+    if len(boxes_true) == 0:
+        return 0, len(boxes_pred), 0
+
+    matching = np.zeros((len(boxes_true), len(boxes_pred)))
+    for i, bt in enumerate(boxes_true):
+        for j, bp in enumerate(boxes_pred):
+            matching[i, j] = box_iou_xyxy(bt, bp)
+
+    # drop all to low matches
+    matching[matching < iou_thresh] = 0
+    # filter too low pairing in columns and rows
+    matching = matching[:, np.sum(matching, axis=0) > 0]
+    matching = matching[np.sum(matching, axis=1) > 0, :]
+    # use hungarian algorithm to find pairing between true - predict
+    pairing = linear_sum_assignment(1.0 - matching)
+
+    # basic metrics
+    tp = len(pairing[0])
+    fp = len(boxes_pred) - tp
+    fn = len(boxes_true) - tp
+    return tp, fp, fn
+
+
+def compute_detect_metrics(boxes_true, boxes_pred, iou_thresh=0.5):
+    """compute metrics: precision, recall, ...
+
+    **Precision** is the ability of a model to identify only the relevant objects.
+     It is the percentage of correct positive predictions = TP / (TP + FP)
+    **Recall** is the ability of a model to find all the relevant cases (all ground truth bounding boxes).
+     It is the percentage of true positive detected among all relevant ground truths = TP / (TP + FN)
+
+    See: https://github.com/rafaelpadilla/Object-Detection-Metrics
+
+    :param list boxes_true: [xmin, ymin, xmax, ymax, class]
+    :param list boxes_pred: [xmin, ymin, xmax, ymax, class]
+    :param float iou_thresh:
+    :return list(dict): list per class
+
+    >>> b_true = [[5, 10, 15, 20, 0], [10, 15, 20, 25, 0], [30, 35, 40, 45, 1]]
+    >>> b_pred = [[5, 10, 15, 15, 0], [10, 10, 20, 20, 0], [10, 5, 20, 25, 0], [10, 10, 20, 25, 1]]
+    >>> stat = compute_detect_metrics(b_true, b_pred)
+    >>> import pandas as pd
+    >>> pd.DataFrame(stat)[list(sorted(stat[0]))]  # doctest: +NORMALIZE_WHITESPACE
+       #annots  #predict  FN  FP  class  f1-score  precision  recall
+    0      2.0       3.0   0   1      0       0.8   0.666667     1.0
+    1      1.0       1.0   1   1      1       0.0   0.000000     0.0
+    """
+
+    boxes_true = np.asanyarray(boxes_true)
+    assert boxes_true.shape[1] == 5
+    boxes_pred = np.asanyarray(boxes_pred)
+    assert boxes_pred.shape[1] == 5
+    classes = np.unique(boxes_pred[:, 4].tolist() + boxes_true[:, 4].tolist())
+    stats = []
+
+    for cls in classes:
+        b_true = boxes_true[boxes_true[:, 4] == cls][:, :4]
+        b_pred = boxes_pred[boxes_pred[:, 4] == cls][:, :4]
+        tp, fp, fn = compute_tp_fp_fn(b_true, b_pred, iou_thresh)
+        nb_true = float(len(b_true))
+        nb_pred = float(len(b_pred))
+        precis = tp / nb_pred if tp else 0.
+        assert 0 <= precis <= 1
+        recall = tp / nb_true if tp else 0.
+        assert 0 <= recall <= 1
+        f1 = 2 * (precis * recall) / (precis + recall) if (precis + recall) else 0.
+        stats.append({
+            'class': cls,
+            'precision': precis,
+            'recall': recall,
+            'f1-score': f1,
+            'FP': fp,
+            'FN': fn,
+            '#annots': nb_true,
+            '#predict': nb_pred,
+        })
+
+    return stats
+
+
+def box_iou_xywh(tensor1, tensor2):
     """Return iou tensor
 
     Parameters
     ----------
-    b1: tensor, shape=(i1,...,iN, 4), xywh
-    b2: tensor, shape=(j, 4), xywh
+    tensor1: tensor, shape=(i1,...,iN, 4), xywh
+    tensor2: tensor, shape=(j, 4), xywh
 
     Returns
     -------
@@ -272,24 +416,24 @@ def box_iou(b1, b2):
     -------
     >>> bbox1 = K.variable(value=[250, 200, 150, 100], dtype='float32')
     >>> bbox2 = K.variable(value=[300, 250, 100, 100], dtype='float32')
-    >>> iou = box_iou(bbox1, bbox2)
+    >>> iou = box_iou_xywh(bbox1, bbox2)
     >>> iou
     <tf.Tensor 'truediv_2:0' shape=(1,) dtype=float32>
     >>> K.eval(iou)
     array([0.1764706], dtype=float32)
     """
     # Expand dim to apply broadcasting.
-    b1 = K.expand_dims(b1, -2)
-    b1_xy = b1[..., :2]
-    b1_wh = b1[..., 2:4]
+    tensor1 = K.expand_dims(tensor1, -2)
+    b1_xy = tensor1[..., :2]
+    b1_wh = tensor1[..., 2:4]
     b1_wh_half = b1_wh / 2.
     b1_mins = b1_xy - b1_wh_half
     b1_maxes = b1_xy + b1_wh_half
 
     # Expand dim to apply broadcasting.
-    b2 = K.expand_dims(b2, 0)
-    b2_xy = b2[..., :2]
-    b2_wh = b2[..., 2:4]
+    tensor2 = K.expand_dims(tensor2, 0)
+    b2_xy = tensor2[..., :2]
+    b2_wh = tensor2[..., 2:4]
     b2_wh_half = b2_wh / 2.
     b2_mins = b2_xy - b2_wh_half
     b2_maxes = b2_xy + b2_wh_half
@@ -362,7 +506,7 @@ def yolo_loss(args, anchors, num_classes, ignore_thresh=0.5, print_loss=False):
         def _loop_body(b, ignore_mask):
             true_box = tf.boolean_mask(y_true[l][b, ..., 0:4],
                                        object_mask_bool[b, ..., 0])
-            iou = box_iou(pred_box[b], true_box)
+            iou = box_iou_xywh(pred_box[b], true_box)
             best_iou = K.max(iou, axis=-1)
             ignore_mask = ignore_mask.write(b, K.cast(best_iou < ignore_thresh,
                                                       K.dtype(true_box)))
@@ -413,15 +557,16 @@ def create_model(input_shape, anchors, num_classes, weights_path=None, model_fac
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
     # K.clear_session()  # get a new session
-    image_input = Input(shape=(None, None, 3))
-    h, w = input_shape
+    cnn_h, cnn_w = input_shape
+    image_input = Input(shape=(cnn_h, cnn_w, 3))
     num_anchors = len(anchors)
 
     model_body = _FACTOR_YOLO_BODY[model_factor](image_input, num_anchors // model_factor, num_classes)
     logging.debug('Create YOLOv3 (model_factor: %i) model with %i anchors and %i classes.',
                   model_factor, num_anchors, num_classes)
 
-    if weights_path is not None:
+    if weights_path:
+        assert os.path.isfile(weights_path), 'missing file: %s' % weights_path
         # model_body = load_model(weights_path, compile=False)
         model_body.load_weights(weights_path, by_name=True, skip_mismatch=True)
         logging.info('Load model "%s".', weights_path)
@@ -436,8 +581,8 @@ def create_model(input_shape, anchors, num_classes, weights_path=None, model_fac
 
     model_loss_fn = Lambda(yolo_loss, output_shape=(1,), name='yolo_loss',
                            arguments=_LOSS_ARGUMENTS)
-    y_true = [Input(shape=(h // {i: _INPUT_SHAPES[i] for i in range(model_factor)}[l],
-                           w // {i: _INPUT_SHAPES[i] for i in range(model_factor)}[l],
+    y_true = [Input(shape=(cnn_h // {i: _INPUT_SHAPES[i] for i in range(model_factor)}[l],
+                           cnn_w // {i: _INPUT_SHAPES[i] for i in range(model_factor)}[l],
                            num_anchors // model_factor,
                            num_classes + 5))
               for l in range(model_factor)]
@@ -464,12 +609,12 @@ def create_model_bottleneck(input_shape, anchors, num_classes, freeze_body=2,
                             weights_path=None, nb_gpu=1):
     """create the training model"""
     # K.clear_session()  # get a new session
-    image_input = Input(shape=(None, None, 3))
-    h, w = input_shape
+    cnn_h, cnn_w = input_shape
+    image_input = Input(shape=(cnn_w, cnn_h, 3))
     num_anchors = len(anchors)
 
-    y_true = [Input(shape=(h // {0: 32, 1: 16, 2: 8}[l],
-                           w // {0: 32, 1: 16, 2: 8}[l],
+    y_true = [Input(shape=(cnn_h // {0: 32, 1: 16, 2: 8}[l],
+                           cnn_w // {0: 32, 1: 16, 2: 8}[l],
                            num_anchors // 3,
                            num_classes + 5))
               for l in range(3)]

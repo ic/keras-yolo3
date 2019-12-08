@@ -16,7 +16,7 @@ import pandas as pd
 import tqdm
 
 sys.path += [os.path.abspath('.'), os.path.abspath('..')]
-from yolo3.utils import update_path
+from keras_yolo3.utils import update_path
 
 IMAGE_EXTENSIONS = ('.png', '.jpg')
 ANNOT_COLUMNS = ('xmin', 'ymin', 'xmax', 'ymax', 'class')

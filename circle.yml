@@ -1,80 +1,172 @@
 version: 2.0
 
+references:
+
+  install_deps: &install_deps
+    run:
+      name: Install Dependences
+      command: |
+        sudo apt-get update -qq
+        sudo apt-get install pkg-config python-dev python-tk
+        # PyPI
+        pip install -r requirements.txt --user
+        python --version ; pip --version ; pip list
+        # Prepare folders
+        mkdir ./results
+
+  tests: &tests
+   run:
+     name: Tests and formating
+     command: |
+       sudo pip install coverage pytest pytest-cov codecov pytest-flake8
+       coverage run --source keras_yolo3 -m py.test keras_yolo3 scripts -v --doctest-modules --junitxml=test-reports/pytest_junit.xml --flake8
+       coverage report && coverage xml -o test-reports/coverage.xml
+       codecov
+
+  dataset: &dataset
+    run:
+      name: Dataset
+      command: |
+        # download the dataset
+        wget -O ./model_data/VOCtrainval_2007.tar  http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCtrainval_06-Nov-2007.tar
+        tar xopf ./model_data/VOCtrainval_2007.tar --directory ./model_data/
+        # prepare dataset for usage
+        python ./scripts/annotation_voc.py --path_dataset ./model_data/VOCdevkit --classes bicycle car person --sets 2007,train 2007,val --path_output ./model_data
+        # cut the dataset size
+        python -c "lines = open('model_data/VOC_2007_val.txt', 'r').readlines(); open('model_data/VOC_2007_val.txt', 'w').writelines(lines[:25])"
+
+  detection: &detection
+    run:
+      name: Detection
+      command: |
+        # download sample video
+        wget -O ./results/volleyball.mp4  https://www.dropbox.com/s/gt6cv49zm1v808q/volleyball.mp4?dl=0
+        # run sample detections
+        python ./scripts/detection.py -w ./model_data/tiny-yolo.h5 -a ./model_data/tiny-yolo_anchors.csv -c ./model_data/coco_classes.txt -o ./results -i ./model_data/bike-car-dog.jpg -v ./results/volleyball.mp4
+        ls -l results/*
+        cat ./results/bike-car-dog.csv
+        rm results/*
+
+  convert: &convert
+    run:
+      name: Convert weights
+      command: |
+        # download and conver weights
+        wget -O ./model_data/tiny-yolo.weights  https://pjreddie.com/media/files/yolov3-tiny.weights  --progress=bar:force:noscroll
+        python ./scripts/convert_weights.py --config_path ./model_data/tiny-yolo.cfg --weights_path ./model_data/tiny-yolo.weights --output_path ./model_data/tiny-yolo.h5
+
 jobs:
-  Py35:
+
+  Py3-Tests:
     docker:
-      - image: circleci/python:3.5
-    steps: &steps
+      - image: circleci/python:3.6
+    environment:
+        - DISPLAY: ""
+    steps:
       - checkout
+      - *install_deps
 
-      - run:
-          name: Install Packages
-          command: |
-            sudo apt-get update
-            sudo apt-get install pkg-config python-dev python-tk
-
-      - run:
-          name: Install PyPI dependences
-          command: |
-            pip install -r requirements.txt --user
-            sudo pip install coverage pytest pytest-cov codecov
-            python --version ; pip --version ; pip list
-
-      - run:
-          name: Testing
-          command: |
-            coverage run --source yolo3 -m py.test yolo3 scripts -v --doctest-modules --junitxml=test-reports/pytest_junit.xml
-            coverage report && coverage xml -o test-reports/coverage.xml
-            codecov
-
-      - run:
-          name: Sample Detection
-          command: |
-            export DISPLAY=""
-            # download and conver weights
-            wget -O ./model_data/tiny-yolo.weights  https://pjreddie.com/media/files/yolov3-tiny.weights  --progress=bar:force:noscroll
-            python ./scripts/convert_weights.py --config_path ./model_data/tiny-yolo.cfg --weights_path ./model_data/tiny-yolo.weights --output_path ./model_data/tiny-yolo.h5
-            mkdir ./results
-            # download sample video
-            wget -O ./results/volleyball.mp4  https://d2v9y0dukr6mq2.cloudfront.net/video/preview/UnK3Qzg/crowds-of-poeple-hot-summer-day-at-wasaga-beach-ontario-canada-during-heatwave_n2t3d8trl__SB_PM.mp4
-            # run sample detections
-            python ./scripts/detection.py -w ./model_data/tiny-yolo.h5 -a ./model_data/tiny-yolo_anchors.csv --model_image_size 416 416 -c ./model_data/coco_classes.txt -o ./results -i ./model_data/bike-car-dog.jpg -v ./results/volleyball.mp4
-            ls -l results/*
-            cat ./results/bike-car-dog.csv
-
-      - run:
-          name: Sample Training
-          command: |
-            export DISPLAY=""
-            # download the dataset
-            wget -O ./model_data/VOCtrainval_2007.tar  http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCtrainval_06-Nov-2007.tar
-            tar xopf ./model_data/VOCtrainval_2007.tar --directory ./model_data/
-            # prepare dataset for usage
-            python ./scripts/annotation_voc.py --path_dataset ./model_data/VOCdevkit --classes bicycle car person --sets 2007,train 2007,val --path_output ./model_data
-            # prepare very tlim training on 2 and 1 epoch
-            printf "image-size: [416, 416]\nbatch-size:\n  head: 4\n  full: 4\nepochs:\n  head: 2\n  full: 1\nvalid-split: 0.2\ngenerator:\n  augument: false\n  nb_threads: 1" > ./model_data/train_tiny-yolo_test.yaml
-            # cut the dataset size
-            python -c "lines = open('model_data/VOC_2007_val.txt', 'r').readlines(); open('model_data/VOC_2007_val.txt', 'w').writelines(lines[:250])"
-            # start the training
-            cat ./model_data/train_tiny-yolo_test.yaml
-            python ./scripts/training.py --path_dataset ./model_data/VOC_2007_val.txt --path_weights ./model_data/tiny-yolo.h5 --path_anchors ./model_data/tiny-yolo_anchors.csv --path_classes ./model_data/voc_classes.txt --path_output ./model_data --path_config ./model_data/train_tiny-yolo_test.yaml
-            # use the train model
-            python ./scripts/detection.py -w ./model_data/tiny-yolo_weights_final.h5 -a ./model_data/tiny-yolo_anchors.csv --model_image_size 416 416 -c ./model_data/voc_classes.txt -o ./results -i ./model_data/bike-car-dog.jpg
-            ls -l results/*
+      - *tests
 
       - store_test_results:
           path: test-reports
       - store_artifacts:
           path: test-reports
 
-  Py36:
+  Py3-Sample-Detection:
     docker:
       - image: circleci/python:3.6
-    steps: *steps
+    environment:
+        - DISPLAY: ""
+    steps:
+      - checkout
+      - *install_deps
+
+      - *convert
+      - *detection
+
+  Py3-Sample-PreTrained:
+    docker:
+      - image: circleci/python:3.6
+    environment:
+      - DISPLAY: ""
+    steps:
+      - checkout
+      - *install_deps
+
+      - *convert
+      - *dataset
+
+      - run:
+          name: Sample ReTraining
+          command: |
+            # generate anchors for tiny-Yolo
+            python ./scripts/clustering.py --path_dataset ./model_data/VOC_2007_val.txt --path_output ./model_data --nb_clusters 6
+            # prepare very tlim training on 2 and 1 epoch
+            printf "image-size: [416, 416]\nbatch-size:\n  head: 3\n  full: 3\nepochs:\n  head: 2\n  full: 1\nvalid-split: 0.2\ngenerator:\n  augment: false\n  nb_threads: 1" > ./model_data/train_tiny-yolo_test.yaml
+            # start the training
+            cat ./model_data/train_tiny-yolo_test.yaml
+            python ./scripts/training.py --path_dataset ./model_data/VOC_2007_val.txt --path_weights ./model_data/tiny-yolo.h5 --path_anchors ./model_data/VOC_2007_val_anchors.csv --path_classes ./model_data/voc_classes.txt --path_output ./model_data --path_config ./model_data/train_tiny-yolo_test.yaml
+            # use the train model
+            mv ./model_data/tiny-yolo_weights_full.h5 ./model_data/tiny-yolo.h5
+
+      - *detection
+
+  Py3-Sample-ZeroTrained:
+    docker:
+      - image: circleci/python:3.6
+    environment:
+      - DISPLAY: ""
+    steps:
+      - checkout
+      - *install_deps
+
+      - *dataset
+
+      - run:
+          name: Sample Training from zero
+          command: |
+            # generate anchors for tiny-Yolo
+            python ./scripts/clustering.py --path_dataset ./model_data/VOC_2007_val.txt --path_output ./model_data --nb_clusters 6
+            # prepare very tlim training on 2 and 1 epoch
+            printf "image-size: [416, 416]\nbatch-size:\n  head: 2\n  full: 2\nepochs:\n  head: 2\n  full: 1\nvalid-split: 0.2\ngenerator:\n  augment: false\n  nb_threads: 1" > ./model_data/train_tiny-yolo_test.yaml
+            # start the training
+            cat ./model_data/train_tiny-yolo_test.yaml
+            python ./scripts/training.py --path_dataset ./model_data/VOC_2007_val.txt --path_anchors ./model_data/VOC_2007_val_anchors.csv --path_classes ./model_data/voc_classes.txt --path_output ./model_data --path_config ./model_data/train_tiny-yolo_test.yaml
+            # use the train model
+            mv ./model_data/tiny-yolo_weights_full.h5 ./model_data/tiny-yolo.h5
+
+      - *detection
+
+#  Py3-Sample-CustomTrain:
+#    docker:
+#      - image: circleci/python:3.6
+#    environment:
+#      - DISPLAY: ""
+#    steps:
+#      - checkout
+#      - *install_deps
+#      - *dataset
+#
+#      - run:
+#          name: Sample custom Training
+#          command: |
+#            # prepare very tlim training on 2 and 1 epoch
+#            printf "image-size: [576, 576]\nbatch-size:\n  head: 1\n  full: 1\nepochs:\n  head: 2\n  full: 1\nvalid-split: 0.2\ngenerator:\n  augment: false\n  nb_threads: 1" > ./model_data/train_tiny-yolo_test.yaml
+#            # start the training
+#            cat ./model_data/train_tiny-yolo_test.yaml
+#            python ./scripts/training.py --path_dataset ./model_data/VOC_2007_val.txt --path_anchors ./model_data/tiny-yolo_anchors.csv --path_classes ./model_data/voc_classes.txt --path_output ./model_data --path_config ./model_data/train_tiny-yolo_test.yaml
+#            # use the train model
+#            mv ./model_data/tiny-yolo_weights_full.h5 ./model_data/tiny-yolo.h5
+#
+#      - *detection
 
 workflows:
   version: 2
   build:
     jobs:
-      - Py35
-      - Py36
+      - Py3-Tests
+      - Py3-Sample-Detection
+      - Py3-Sample-PreTrained
+      - Py3-Sample-ZeroTrained
+      #- Py3-Sample-CustomTrain

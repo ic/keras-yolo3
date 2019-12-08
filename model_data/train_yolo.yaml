@@ -1,9 +1,9 @@
 image-size: [608, 608]
 batch-size:
   bottlenecks: 8
-  head: 8
-  # the unfreezed model takes more memory
-  full: 4
+  head: 4
+  # the unfreeze model takes more memory
+  full: 2
 epochs:
   bottlenecks: 25
   head: 50
@@ -16,12 +16,7 @@ CB_stopping:
   patience: 25
 valid-split: 0.1
 generator:
-  jitter: 0.3
-  color_hue: 0.1
-  color_sat: 1.5
-  color_val: 1.5
-  flip_horizontal: true
-  flip_vertical: false
+  augment: false
   resize_img: true
   nb_threads: 0.9
 recompute-bottlenecks: false

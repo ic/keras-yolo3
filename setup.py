@@ -8,11 +8,6 @@ https://github.com/pypa/sampleproject
 # Always prefer setuptools over distutils
 from os import path
 from setuptools import setup
-# io.open is needed for projects that support Python 2.7
-# It ensures open() defaults to text mode with universal newlines,
-# and accepts an argument to specify the text encoding
-# Python 3 only projects can skip this import
-from io import open
 
 
 # Arguments marked as "Required" below must be included for upload to PyPI.
@@ -24,7 +19,7 @@ def _parse_requirements(file_path):
             for r in [s.strip() for s in fp.readlines()]
             if not r.startswith('#') and not r.endswith('#dev')
         ]
-        return reqs
+    return reqs
 
 
 HERE = path.abspath(path.dirname(__file__))
@@ -36,9 +31,9 @@ with open(path.join(HERE, 'README.md'), encoding='utf-8') as fp:
 install_reqs = _parse_requirements(path.join(HERE, 'requirements.txt'))
 
 setup(
-    name='keras-yolo3',  # Required
-    version='0.1',  # Required
-    packages=['yolo3'],  # Required
+    name='keras_yolo3',  # Required
+    version='0.1.0',  # Required
+    packages=['keras_yolo3'],  # Required
     description='YOLO v3 in Keras',  # Required
     author='qqwweee',  # Optional
     author_email='qqwweee',  # Optional
@@ -49,7 +44,7 @@ setup(
     classifiers=[  # Optional
         # How mature is this project? Common values are
         #   3 - Alpha; 4 - Beta; 5 - Production/Stable
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
         # Indicate who your project is intended for
         'Intended Audience :: Developers',
         # Pick your license as you wish
@@ -61,6 +56,7 @@ setup(
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
     ],
     keywords='Yolo CNN object-detector',  # Optional
 )

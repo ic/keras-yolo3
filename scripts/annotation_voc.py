@@ -26,7 +26,7 @@ import xml.etree.ElementTree as ET
 import tqdm
 
 sys.path += [os.path.abspath('.'), os.path.abspath('..')]
-from yolo3.utils import update_path
+from keras_yolo3.utils import update_path
 
 
 def parse_arguments():

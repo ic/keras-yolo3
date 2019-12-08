@@ -9,16 +9,17 @@ import logging
 import colorsys
 
 import numpy as np
-from keras import backend as K
+import keras.backend as K
 from keras.models import load_model
 from keras.layers import Input
 from keras.utils import multi_gpu_model
 
-from yolo3.model import yolo_eval, yolo_body_full, yolo_body_tiny
-from yolo3.utils import letterbox_image, update_path, get_anchors, get_class_names
-from yolo3.visual import draw_bounding_box
+from .model import yolo_eval, yolo_body_full, yolo_body_tiny
+from .utils import letterbox_image, update_path, get_anchors, get_class_names
+from .visual import draw_bounding_box
 
-PREDICT_FIELDS = ('class', 'label', 'score', 'xmin', 'ymin', 'xmax', 'ymax')
+# swap X-Y axis
+PREDICT_FIELDS = ('class', 'label', 'confidence', 'ymin', 'xmin', 'ymax', 'xmax')
 
 
 class YOLO(object):
@@ -33,7 +34,7 @@ class YOLO(object):
     >>> path_model = os.path.join(update_path('model_data'), 'yolo_empty.h5')
     >>> yolo_empty.save(path_model)
     >>> # use the empty one, so no reasonable detections are expected
-    >>> from yolo3.utils import image_open
+    >>> from keras_yolo3.utils import image_open
     >>> yolo = YOLO(weights_path=path_model,
     ...             anchors_path=YOLO.get_defaults('anchors_path'),
     ...             classes_path=YOLO.get_defaults('classes_path'),
@@ -49,7 +50,7 @@ class YOLO(object):
         "classes_path": os.path.join(update_path('model_data'), 'coco_classes.txt'),
         "score": 0.3,
         "iou": 0.45,
-        "model_image_size": (416, 416),
+        # "model_image_size": (416, 416),
         "nb_gpu": 1,
     }
 
@@ -59,7 +60,7 @@ class YOLO(object):
             logging.warning('Unrecognized attribute name "%s"', name)
         return cls._DEFAULT_PARAMS.get(name)
 
-    def __init__(self, weights_path, anchors_path, classes_path, model_image_size,
+    def __init__(self, weights_path, anchors_path, classes_path, model_image_size=(None, None),
                  score=0.3, iou=0.45, nb_gpu=1, **kwargs):
         """
 
@@ -78,35 +79,35 @@ class YOLO(object):
         self.classes_path = update_path(classes_path)
         self.score = score
         self.iou = iou
-        self.model_image_size = model_image_size
+
         self.nb_gpu = nb_gpu
         if not self.nb_gpu:
             # disable all GPUs
             os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+
         self.class_names = get_class_names(self.classes_path)
         self.anchors = get_anchors(self.anchors_path)
         self._open_session()
-        self.boxes, self.scores, self.classes = self._create_model()
+        self.boxes, self.scores, self.classes = self._create_model(model_image_size)
+
         self._generate_class_colors()
 
     def _open_session(self):
-        if K.backend() == 'tensorflow':
+        if K.backend().lower() == 'tensorflow':
             import tensorflow as tf
-            from keras.backend.tensorflow_backend import set_session
-
             config = tf.ConfigProto(allow_soft_placement=True,
                                     log_device_placement=False)
             config.gpu_options.force_gpu_compatible = True
-            # config.gpu_options.per_process_gpu_memory_fraction = 0.5
+            # config.gpu_options.per_process_gpu_memory_fraction = 0.3
             # Don't pre-allocate memory; allocate as-needed
             config.gpu_options.allow_growth = True
+            self.sess = tf.Session(config=config)
+            K.tensorflow_backend.set_session(self.sess)
+        else:
+            logging.warning('Using %s backend.', K.backend())
+            self.sess = K.get_session()
 
-            sess = tf.Session(config=config)
-            set_session(sess)
-
-        self.sess = K.get_session()
-
-    def _create_model(self):
+    def _create_model(self, model_image_size=(None, None)):
         # weights_path = update_path(self.weights_path)
         logging.debug('loading model from "%s"', self.weights_path)
         assert self.weights_path.endswith('.h5'), 'Keras model or weights must be a .h5 file.'
@@ -117,14 +118,14 @@ class YOLO(object):
         try:
             self.yolo_model = load_model(self.weights_path, compile=False)
         except Exception:
+            logging.warning('Loading weights from "%s"', self.weights_path)
             is_tiny_version = (num_anchors == 6)  # default setting
-            logging.exception('Loading weights from "%s"', self.weights_path)
+            cnn_h, cnn_w = model_image_size
+            input = Input(shape=(cnn_h, cnn_w, 3))
             if is_tiny_version:
-                self.yolo_model = yolo_body_tiny(Input(shape=(None, None, 3)),
-                                                 num_anchors // 2, num_classes)
+                self.yolo_model = yolo_body_tiny(input, num_anchors // 2, num_classes)
             else:
-                self.yolo_model = yolo_body_full(Input(shape=(None, None, 3)),
-                                                 num_anchors // 3, num_classes)
+                self.yolo_model = yolo_body_full(input, num_anchors // 3, num_classes)
             # make sure model, anchors and classes match
             self.yolo_model.load_weights(self.weights_path, by_name=True, skip_mismatch=True)
         else:
@@ -164,11 +165,13 @@ class YOLO(object):
 
     def detect_image(self, image):
         start = time.time()
+        # this should be taken from the model
+        model_image_size = self.yolo_model._input_layers[0].input_shape[1:3]
 
-        if self.model_image_size != (None, None):
-            assert self.model_image_size[0] % 32 == 0, 'Multiples of 32 required'
-            assert self.model_image_size[1] % 32 == 0, 'Multiples of 32 required'
-            boxed_image = letterbox_image(image, tuple(reversed(self.model_image_size)))
+        if all(model_image_size):
+            for size in model_image_size:
+                assert size % 32 == 0, 'Multiples of 32 required'
+            boxed_image = letterbox_image(image, tuple(reversed(model_image_size)))
         else:
             new_image_size = (image.width - (image.width % 32),
                               image.height - (image.height % 32))
@@ -191,7 +194,7 @@ class YOLO(object):
         end = time.time()
         logging.debug('Found %i boxes in %f sec.', len(out_boxes), (end - start))
 
-        thickness = (image.size[0] + image.size[1]) // 300
+        thickness = (image.size[0] + image.size[1]) // 500
 
         predicts = []
         for i, c in reversed(list(enumerate(out_classes))):
