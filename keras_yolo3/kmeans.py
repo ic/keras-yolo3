@@ -92,8 +92,8 @@ class YOLO_Kmeans:
             infos = line.strip().split(' ')
             for bbox in infos[1:]:
                 box = list(map(float, bbox.split(',')))
-                width = box[2] - box[0]
-                height = box[3] - box[1]
+                width = abs(box[2] - box[0])
+                height = abs(box[3] - box[1])
                 dataset.append([width, height])
         bboxes_wh = np.array(dataset)
         return bboxes_wh

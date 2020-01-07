@@ -1,7 +1,7 @@
 """
 Prepare custom anchors on you dataset
 
-    python training.py \
+    python clustering.py \
         --path_dataset ../model_data/VOC_2007_train.txt \
         --path_output ../model_data
 
